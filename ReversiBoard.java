@@ -13,7 +13,6 @@ public class ReversiBoard extends UnicastRemoteObject implements ReversiBoardInt
     private int newPlayerCounter = 0;
     private boolean gameOn = true;
     private int currentPlayer = 1;
-    private int update = 0;
     private int[] boardArray = null;
 
     public int getNewPlayer(){
@@ -51,9 +50,7 @@ public class ReversiBoard extends UnicastRemoteObject implements ReversiBoardInt
 
     public String getCurrentPlayer() {
         if(currentPlayer == 1) return "Player1";
-        else {
-            return "Player2";
-        }
+        else return "Player2";
     }
 
     public String getScoreString() throws RemoteException {
@@ -71,7 +68,6 @@ public class ReversiBoard extends UnicastRemoteObject implements ReversiBoardInt
             boardArray[move] = player;
             updateBoard(player, move);
             currentPlayer = opponent(player);
-            update++;
             return true;
         } else return false;
     }
