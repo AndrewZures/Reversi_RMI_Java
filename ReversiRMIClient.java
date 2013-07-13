@@ -8,7 +8,6 @@ import java.util.StringTokenizer;
 
 public class ReversiRMIClient extends UnicastRemoteObject implements ReversiRMIClientInterface {
     private ReversiBoardInterface board = null;
-    private String playerName;
     private int playerNum;
     java.util.Scanner scan = new java.util.Scanner(System.in);
 
@@ -17,15 +16,24 @@ public class ReversiRMIClient extends UnicastRemoteObject implements ReversiRMIC
         this.playerNum = board.getNewPlayer();
     }
 
+    public static void main(String[] args){
+        try{
+            ReversiBoardInterface game = (ReversiBoardInterface) java.rmi.Naming.lookup("reversi");
+            ReversiRMIClient client = new ReversiRMIClient(game);
+            client.go();
+        }
+        catch (Exception e){System.out.println(e);}
+    }
+
     public void go() throws Exception{
-        System.out.println("YOU ARE: "+playerNum);
+        printGameInstructions();
         if(playerNum > 2)
             this.observerGo();
         else this.playerGo();
     }
 
-
     public void observerGo() throws Exception {
+        System.out.println("YOU ARE AN OBSERVER");
         boolean gameOn = true;
         this.printPlayerTurn();
         this.updateBoard();
@@ -45,8 +53,13 @@ public class ReversiRMIClient extends UnicastRemoteObject implements ReversiRMIC
 
     public void playerGo() throws Exception{
         boolean contGame = true;
-        while(board.checkGameState() == 1 && contGame){
-
+        while(contGame){
+            if(board.gameOver()){
+                board.reset();
+                if(this.askForNewGame())
+                    this.printGameInstructions();
+                else{break;}
+            }
             if(!myturn()) {
                 this.updateBoard();
                 this.printScore();
@@ -54,18 +67,15 @@ public class ReversiRMIClient extends UnicastRemoteObject implements ReversiRMIC
             }
             while(!myturn()) Thread.sleep(3000);
 
-            this.updateBoard();
-            this.printScore();
-            this.printValidMoves();
-            this.myTurnMessage();
+            this.updatePlayer();
             while (myturn()){
+                System.out.print("Player" + playerNum + " >>");
                 String input = scan.nextLine();
                 if (input.equals("exit")){
                     contGame = !contGame;
                     break;
                 }
                 executeInput(input);
-
                 Thread.sleep(1000);
             }
         }
@@ -76,68 +86,119 @@ public class ReversiRMIClient extends UnicastRemoteObject implements ReversiRMIC
         StringTokenizer tokenizer = new StringTokenizer(input);
         String action = tokenizer.nextToken();
 
+        if(action.equalsIgnoreCase("p")){
+            this.printBoard(board.getBoardString());
+            return;
+        }
+        else if(action.equalsIgnoreCase("v")){
+            this.printValidMoves();
+            return;
+        }
+        else if(action.equalsIgnoreCase("l")){
+            printCurrentPlayer();
+            return;
+        }
+        else if(action.equalsIgnoreCase("myturn?")){
+            boolean result = board.myTurn(playerNum);
+            if(result) reply = "yes";
+            else reply = "no";
+            return;
+        }
+        else if(action.equalsIgnoreCase("s")){
+            this.printScore();
+        }
+
         try{
             int move = Integer.valueOf(action);
             this.makeMove(move);
-
-            if(action.equalsIgnoreCase("p"))
-                this.printBoard(board.getBoardString());
-
-            if(action.equalsIgnoreCase("v"))
-                this.printValidMoves();
-
-            if(action.equalsIgnoreCase("l"))
-                printCurrentPlayer();
-
-            if(action.equalsIgnoreCase("myturn?")){
-                boolean result = board.myTurn(playerNum);
-                if(result) reply = "yes";
-                else reply = "no";
-            }
-
-            if(action.equalsIgnoreCase("s")){
-                this.printScore();
-            }
-
             System.out.println(reply);
         }
         catch (NumberFormatException nfe){
             printInputError();
         }
+    }
 
+    public void updatePlayer() throws Exception {
+        this.updateBoard();
+        this.printScore();
+        this.printValidMoves();
+        this.myTurnMessage();
+    }
+
+    private boolean myturn() throws Exception {
+        return board.myTurn(playerNum);
+    }
+
+    private void makeMove(int move) throws Exception{
+        boolean result = board.makeMove(move, playerNum);
+        if(result)
+            System.out.println("Move Accepted");
+        else System.out.println("Move Denied, Try Again");
     }
 
     private void printInputError(){
         System.out.println("Invalid Move, Try Again");
     }
 
+    private String getCurrentPlayer() throws Exception{
+        return board.getCurrentPlayer();
+    }
+
     private void printCurrentPlayer() throws Exception{
-        System.out.println(board.getCurrentPlayer());
+        System.out.println("Current Player is: "+board.getCurrentPlayer());
     }
 
+    private void printPlayerTurn() throws Exception{
+        System.out.println("Turn: "+getCurrentPlayer());
+    }
 
-    private ArrayList<Integer> getIntegerMovesList() throws Exception{
-        String temp = ""+board.getValidMoves(playerNum);
-        temp = temp.replaceAll("\\[", "").replaceAll("\\]","");
-        String moves = temp.replaceAll(",", "");
-        StringTokenizer moveTokenizer = new StringTokenizer(moves);
-        ArrayList<Integer> moveList =new ArrayList<Integer>();
-        while(moveTokenizer.hasMoreTokens()){
-            String move = moveTokenizer.nextToken();
-            int num = Integer.parseInt(move);
-            moveList.add(num);
+    private void updateBoard() throws Exception {
+        this.printBoard(board.getBoardString());
+    }
+
+    private void printScore() throws Exception {
+        System.out.println(board.getScoreString());
+    }
+
+    private void waitMessage(){
+        System.out.println("Waiting for Other Player To Move...");
+    }
+
+    private void printValidMoves() throws Exception{
+        System.out.println("Valid Moves: " + board.getValidMoves(playerNum));
+    }
+
+    private void printGameInstructions(){
+        System.out.println("WELCOME TO REVERSI!!!");
+        System.out.println("    NOTE: Player1 is '(@)', Player2 is '(_)");
+        System.out.println("    NOTE: '*' indicates a legal move!");
+    }
+
+    private boolean askForNewGame(){
+        System.out.println("Game Over");
+        System.out.println("Would you like to play a new game? press 'Y' if so, any other key to exit");
+        String result = scan.nextLine();
+        if(result.equalsIgnoreCase("y")){
+            return true;
         }
-        return moveList;
+        else return false;
     }
 
-    public void printBoard(String board) throws Exception{
-        StringTokenizer tokenizer = new StringTokenizer(board);
+    private void myTurnMessage(){
+        System.out.println("Your Turn!  Choose:");
+        System.out.println("     A valid move number e.g. '19' to take spot 19");
+        System.out.println("    'V': get valid moves");
+        System.out.println("    'P': print board");
+        System.out.println("    'S': get game score");
+        System.out.println("    'L': player with current turn");
+    }
+
+    public void printBoard(String boardArray) throws Exception{
+        StringTokenizer tokenizer = new StringTokenizer(boardArray);
         String element = "";
 
         ArrayList<Integer> moveList = new ArrayList<Integer>();
-        if(myturn()){
-            moveList = getIntegerMovesList();
-        }
+        if(myturn()) moveList = board.getValidMoves(playerNum);
 
         int count = 0;
         System.out.println("----------------------------------------------------------");
@@ -161,58 +222,4 @@ public class ReversiRMIClient extends UnicastRemoteObject implements ReversiRMIC
         }
         System.out.println("----------------------------------------------------------");
     }
-
-    private boolean myturn() throws Exception {
-        return board.myTurn(playerNum);
-    }
-
-    private void updateBoard() throws Exception {
-        this.printBoard(board.getBoardString());
-    }
-
-    private void printScore() throws Exception {
-        System.out.println(board.getScoreString());
-    }
-
-    private void waitMessage(){
-        System.out.println("Waiting for Other Player To Move...");
-    }
-
-    private void myTurnMessage(){
-        System.out.println("Your Turn!  Choose:");
-        System.out.println("    'V': get valid moves");
-        System.out.println("    'P': print board");
-        System.out.println("    'S': get game score");
-        System.out.println("    'L': player with current turn");
-    }
-
-    private void printValidMoves() throws Exception{
-        System.out.println("Valid Moves: " + board.getValidMoves(playerNum));
-    }
-
-    private String getCurrentPlayer() throws Exception{
-        return board.getCurrentPlayer();
-    }
-
-    private void makeMove(int move) throws Exception{
-        boolean result = board.makeMove(move, playerNum);
-        if(result)
-            System.out.println("Move Accepted");
-        else System.out.println("Move Denied, Try Again");
-    }
-
-    private void printPlayerTurn() throws Exception{
-        System.out.println("Turn: "+getCurrentPlayer());
-    }
-
-    public static void main(String[] args){
-        try{
-            ReversiBoardInterface game = (ReversiBoardInterface) java.rmi.Naming.lookup("reversi");
-            ReversiRMIClient client = new ReversiRMIClient(game);
-            client.go();
-        }
-        catch (Exception e){System.out.println(e);}
-
-    }
-
 }

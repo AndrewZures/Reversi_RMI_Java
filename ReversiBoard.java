@@ -143,14 +143,20 @@ public class ReversiBoard extends UnicastRemoteObject implements ReversiBoardInt
         return playerPieces;
     }
 
-    public int checkGameState() throws RemoteException {
+    public void reset() throws RemoteException{
+        initializeBoard();
+        setInitialPieces();
+        currentPlayer = 1;
+    }
+
+    public boolean gameOver() throws RemoteException {
         ArrayList<Integer> player1Moves = getValidMoves(PLAYER1);
         ArrayList<Integer> player2Moves = getValidMoves(PLAYER2);
         if(player1Moves.isEmpty() && player2Moves.isEmpty()){
             this.gameOn = false;
-            return 0;
+            return true;
         }
-        else return 1;
+        else return false;
     }
 
     public int getScore(int player) throws RemoteException {
